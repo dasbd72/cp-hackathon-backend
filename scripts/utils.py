@@ -1,6 +1,8 @@
 import json
 from typing import Optional
 
+import boto3.session
+
 
 def read_config(config_path) -> Optional[dict]:
     """
@@ -38,3 +40,13 @@ def read_confirm_config(config_path) -> Optional[dict]:
     if not confirm_config(config):
         return None
     return config
+
+
+def get_boto3_session(config: dict):
+    """
+    Creates a boto3 session using the provided configuration.
+    """
+    return boto3.session.Session(
+        profile_name=config["aws_profile"],
+        region_name=config["aws_region"],
+    )
