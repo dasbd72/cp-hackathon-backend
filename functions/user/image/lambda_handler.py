@@ -49,18 +49,25 @@ class UserImageHandler:
         }
         return response
 
+    def generate_user_image_presigned_url(self) -> str:
+        if self.user_id is None:
+            raise ValueError("Unauthorized: No user ID found in claims")
+
+        # Generate a presigned URL for the image
+        s3_key = f"roles/{self.username}.jpg"
+        presigned_url = self.s3.generate_presigned_url(
+            "put_object",
+            Params={"Bucket": self.image_storage_bucket_name, "Key": s3_key},
+            ExpiresIn=3600,  # URL valid for 1 hour
+        )
+        return presigned_url
+
     def get_user_image(self):
         if self.user_id is None:
             raise ValueError("Unauthorized: No user ID found in claims")
 
         # Acquire presigned URL for the image
-        image_name = f"{self.username}.jpg"
-        s3_key = f"roles/{image_name}"
-        presigned_url = self.s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self.image_storage_bucket_name, "Key": s3_key},
-            ExpiresIn=3600,  # URL valid for 1 hour
-        )
+        presigned_url = self.generate_user_image_presigned_url()
         return {
             "image_url": presigned_url,
         }
@@ -71,12 +78,9 @@ class UserImageHandler:
         if "image" not in body:
             raise ValueError("Image data is required")
 
-        image = body.get("image")
-        image_data = base64.b64decode(image)
-        image_name = f"{self.username}.jpg"
-        s3_key = f"roles/{image_name}"
-
         # Upload the image to S3
+        image_data = base64.b64decode(body.get("image"))
+        s3_key = f"roles/{self.username}.jpg"
         self.s3.put_object(
             Bucket=self.image_storage_bucket_name,
             Key=s3_key,
@@ -84,11 +88,7 @@ class UserImageHandler:
             ContentType="image/jpeg",
         )
         # Acquire presigned URL for the image
-        presigned_url = self.s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self.image_storage_bucket_name, "Key": s3_key},
-            ExpiresIn=3600,  # URL valid for 1 hour
-        )
+        presigned_url = self.generate_user_image_presigned_url()
         return {
             "image_url": presigned_url,
         }
