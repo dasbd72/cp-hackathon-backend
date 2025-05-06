@@ -106,7 +106,9 @@ class UserImageHandler:
                 message="Unauthorized: No user ID found in claims"
             )
 
-        query_params = self.event.get("queryStringParameters", {})
+        query_params = self.event.get("queryStringParameters")
+        if not query_params:
+            query_params = {}
         username = query_params.get("username", self.username)
 
         presigned_url = self.get_user_image(username=username)
