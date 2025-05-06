@@ -63,9 +63,9 @@ class UserImageHandler:
             "email": self.email,
         }
 
-    def generate_user_image_presigned_url(self, username: str) -> str:
+    def generate_user_image_presigned_url(self, user_id: str) -> str:
         # Generate a presigned URL for the image
-        s3_key = f"roles/{username}.jpg"
+        s3_key = f"roles/{user_id}.jpg"
         presigned_url = self.s3.generate_presigned_url(
             "get_object",
             Params={"Bucket": self.image_storage_bucket_name, "Key": s3_key},
@@ -73,8 +73,8 @@ class UserImageHandler:
         )
         return presigned_url
 
-    def get_user_image(self, username: str):
-        s3_key = f"roles/{username}.jpg"
+    def get_user_image(self, user_id: str):
+        s3_key = f"roles/{user_id}.jpg"
         try:
             self.s3.head_object(
                 Bucket=self.image_storage_bucket_name, Key=s3_key
@@ -83,13 +83,13 @@ class UserImageHandler:
             return None
         # If the image exists, return the presigned URL
         presigned_url = self.generate_user_image_presigned_url(
-            username=username
+            user_id=user_id
         )
         return presigned_url
 
     def update_user_image(self, image_data: bytes):
         # Upload the image to S3
-        s3_key = f"roles/{self.username}.jpg"
+        s3_key = f"roles/{self.user_id}.jpg"
         self.s3.put_object(
             Bucket=self.image_storage_bucket_name,
             Key=s3_key,
@@ -97,7 +97,7 @@ class UserImageHandler:
             ContentType="image/*",
         )
         # Acquire presigned URL for the image
-        presigned_url = self.generate_user_image_presigned_url(self.username)
+        presigned_url = self.generate_user_image_presigned_url(self.user_id)
         return presigned_url
 
     def handle_get_user_image(self):
@@ -109,15 +109,15 @@ class UserImageHandler:
         query_params = self.event.get("queryStringParameters")
         if not query_params:
             query_params = {}
-        username = query_params.get("username", self.username)
+        user_id = query_params.get("user_id", self.user_id)
 
-        presigned_url = self.get_user_image(username=username)
+        presigned_url = self.get_user_image(user_id=user_id)
         if presigned_url is None:
             return self.get_400_response(
-                message=f"Image not found for user: {username}",
+                message=f"Image not found for user: {user_id}",
             )
         return self.get_200_response(
-            message=f"Image found for user: {username}",
+            message=f"Image found for user: {user_id}",
             data={
                 "image_url": presigned_url,
             },
@@ -141,7 +141,7 @@ class UserImageHandler:
         return self.get_200_response(
             message="Image updated successfully",
             data={
-                "image_url": self.generate_user_image_presigned_url(),
+                "image_url": self.generate_user_image_presigned_url(self.user_id),
             },
         )
 
