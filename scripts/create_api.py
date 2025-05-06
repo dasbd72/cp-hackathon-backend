@@ -118,16 +118,25 @@ class ApiCreator:
                     "S3Bucket": bucket_name,
                     "S3Key": bucket_key,
                 },
+                Timeout=30,
             )
             function_arn = response["FunctionArn"]
         else:
             print(f"Function with name {function_name} found, updating it.")
-            response = self.lmbda.update_function_code(
+            self.lmbda.update_function_configuration(
+                FunctionName=function_name,
+                Role=self.config["role_arn"],
+                Handler="lambda_handler.lambda_handler",
+                Timeout=30,
+            )
+            self.lmbda.get_waiter("function_updated").wait(
+                FunctionName=function_name,
+            )
+            self.lmbda.update_function_code(
                 FunctionName=function_name,
                 S3Bucket=bucket_name,
                 S3Key=bucket_key,
             )
-            function_arn = response["FunctionArn"]
         return function_arn
 
     def create_cognito_user_pool(self) -> str:
@@ -567,6 +576,17 @@ class ApiCreator:
         )
         print(f"User Settings function ARN: {user_settings_function_arn}")
 
+        # Compress, Upload, and Create the user image lambda function
+        user_image_function_arn = self.create_lambda_function(
+            function_name="cp_hackathon_user_image",
+            bucket_name=self.config["lambda_bucket_name"],
+            bucket_key=self.compress_and_upload_function_code(
+                function_path="functions/user/image",
+                bucket_name=self.config["lambda_bucket_name"],
+            ),
+        )
+        print(f"User Image function ARN: {user_image_function_arn}")
+
         # # Create the user pool
         # user_pool_id = self.create_cognito_user_pool()
         # print(f"User Pool ID: {user_pool_id}")
@@ -616,7 +636,7 @@ class ApiCreator:
             root_id,
             "user",
         )
-        print(f"User ID: {user_id}")
+        print(f"User Resource ID: {user_id}")
 
         # Create the user settings resource
         user_settings_id = self.create_resource(
@@ -624,7 +644,7 @@ class ApiCreator:
             user_id,
             "settings",
         )
-        print(f"User Settings ID: {user_settings_id}")
+        print(f"User Settings Resource ID: {user_settings_id}")
 
         # Create CORS for the user settings resource
         self.create_resource_cors(
@@ -632,85 +652,104 @@ class ApiCreator:
             resource_id=user_settings_id,
         )
 
-        # Create the user settings methods
-        self.create_method(
+        # Create GET and PUT methods for the user settings resource
+        for httpMethod in ["GET", "PUT"]:
+            self.create_method(
+                api_id=api_id,
+                resource_id=user_settings_id,
+                http_method=httpMethod,
+                # authorizer_id=authorizer_id,
+            )
+            # Create the user settings integration
+            self.apigateway.put_integration(
+                restApiId=api_id,
+                resourceId=user_settings_id,
+                httpMethod=httpMethod,
+                type="AWS_PROXY",
+                integrationHttpMethod="POST",
+                uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{user_settings_function_arn}/invocations",
+                credentials=self.config["role_arn"],
+                requestTemplates={"application/json": '{"statusCode": 200}'},
+                passthroughBehavior="WHEN_NO_MATCH",
+                contentHandling="CONVERT_TO_TEXT",
+                timeoutInMillis=10000,  # 10 seconds
+            )
+            self.apigateway.put_integration_response(
+                restApiId=api_id,
+                resourceId=user_settings_id,
+                httpMethod=httpMethod,
+                statusCode="200",
+                responseParameters={
+                    "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+                    "method.response.header.Access-Control-Allow-Origin": "'*'",
+                    "method.response.header.Access-Control-Allow-Methods": f"'{httpMethod}'",
+                },
+                responseTemplates={
+                    "application/json": json.dumps(
+                        {
+                            "username": "dasbd72",
+                            "email": "twbd723@gmail.com",
+                        },
+                    )
+                },
+            )
+
+        # Create the user image resource
+        user_image_id = self.create_resource(
+            api_id,
+            user_id,
+            "image",
+        )
+        print(f"User Image Resource ID: {user_image_id}")
+
+        # Create CORS for the user image resource
+        self.create_resource_cors(
             api_id=api_id,
-            resource_id=user_settings_id,
-            http_method="GET",
-            # authorizer_id=authorizer_id,
-        )
-        # Create the user settings integration
-        self.apigateway.put_integration(
-            restApiId=api_id,
-            resourceId=user_settings_id,
-            httpMethod="GET",
-            type="AWS_PROXY",
-            integrationHttpMethod="POST",
-            uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{user_settings_function_arn}/invocations",
-            credentials=self.config["role_arn"],
-            requestTemplates={"application/json": '{"statusCode": 200}'},
-            passthroughBehavior="WHEN_NO_MATCH",
-            contentHandling="CONVERT_TO_TEXT",
-        )
-        self.apigateway.put_integration_response(
-            restApiId=api_id,
-            resourceId=user_settings_id,
-            httpMethod="GET",
-            statusCode="200",
-            responseParameters={
-                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                "method.response.header.Access-Control-Allow-Origin": "'*'",
-                "method.response.header.Access-Control-Allow-Methods": "'GET'",
-            },
-            responseTemplates={
-                "application/json": json.dumps(
-                    {
-                        "username": "dasbd72",
-                        "email": "twbd723@gmail.com",
-                    },
-                )
-            },
+            resource_id=user_image_id,
         )
 
-        # Create the user settings methods
-        self.create_method(
-            api_id=api_id,
-            resource_id=user_settings_id,
-            http_method="PUT",
-            # authorizer_id=authorizer_id,
-        )
-        # Create the user settings integration
-        self.apigateway.put_integration(
-            restApiId=api_id,
-            resourceId=user_settings_id,
-            httpMethod="PUT",
-            type="AWS_PROXY",
-            integrationHttpMethod="POST",
-            uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{user_settings_function_arn}/invocations",
-            credentials=self.config["role_arn"],
-            requestTemplates={"application/json": '{"statusCode": 200}'},
-            passthroughBehavior="WHEN_NO_MATCH",
-            contentHandling="CONVERT_TO_TEXT",
-        )
-        self.apigateway.put_integration_response(
-            restApiId=api_id,
-            resourceId=user_settings_id,
-            httpMethod="PUT",
-            statusCode="200",
-            responseParameters={
-                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                "method.response.header.Access-Control-Allow-Origin": "'*'",
-                "method.response.header.Access-Control-Allow-Methods": "'PUT'",
-            },
-            responseTemplates={
-                "application/json": json.dumps(
-                    {
-                        "username": "dasbd72",
-                        "email": "twbd723@gmail.com",
-                    },
-                )
-            },
-        )
+        # Create GET and POST methods for the user image resource
+        for httpMethod in ["GET", "POST"]:
+            self.create_method(
+                api_id=api_id,
+                resource_id=user_image_id,
+                http_method=httpMethod,
+                # authorizer_id=authorizer_id,
+            )
+            # Create the user image integration
+            self.apigateway.put_integration(
+                restApiId=api_id,
+                resourceId=user_image_id,
+                httpMethod=httpMethod,
+                type="AWS_PROXY",
+                integrationHttpMethod="POST",
+                uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{user_image_function_arn}/invocations",
+                credentials=self.config["role_arn"],
+                requestTemplates={"application/json": '{"statusCode": 200}'},
+                passthroughBehavior="WHEN_NO_MATCH",
+                contentHandling="CONVERT_TO_TEXT",
+                timeoutInMillis=10000, # 10 seconds
+            )
+            self.apigateway.put_integration_response(
+                restApiId=api_id,
+                resourceId=user_image_id,
+                httpMethod=httpMethod,
+                statusCode="200",
+                responseParameters={
+                    "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+                    "method.response.header.Access-Control-Allow-Origin": "'*'",
+                    "method.response.header.Access-Control-Allow-Methods": f"'{httpMethod}'",
+                },
+                responseTemplates={
+                    "application/json": json.dumps(
+                        {
+                            "data": {
+                                "image_url": "https://example.com/image.jpg"
+                            }
+                        },
+                    )
+                },
+            )
 
         # print("Client ID:", user_pool_client_id)
         # print(
