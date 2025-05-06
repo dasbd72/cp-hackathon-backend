@@ -13,52 +13,42 @@ class UserSettingsHandler:
         self.user_settings_table = self.dynamodb.Table(
             self.user_settings_db_table_name
         )
+        self.headers = {
+            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "OPTIONS,PUT,GET",
+        }
 
+        self.event = None
+        self.body = None
         self.user_id = None
         self.username = None
         self.email = None
 
-    def handle(self, event, context):
-        claims = (
-            event.get("requestContext", {}).get("authorizer", {}).get("claims")
-        )
-        if claims:
-            self.user_id = claims.get("sub")
-            self.username = claims.get("cognito:username")
-            self.email = claims.get("email")
-
-        httpMethod = event.get("httpMethod")
-        body = json.loads(event.get("body", "{}")) if event.get("body") else {}
-
-        response_data = {
-            "event": event,
-            "status": "success",
+    def get_400_response(self, code=400, message="Bad Request"):
+        return {
+            "statusCode": code,
+            "headers": self.headers,
+            "body": json.dumps(
+                {
+                    "event": self.event,
+                    "error": message,
+                }
+            ),
         }
-        try:
-            if self.user_id is None:
-                raise ValueError("Unauthorized: No user ID found in claims")
 
-            if httpMethod == "GET":
-                response_data["data"] = self.get_user_settings()
-            elif httpMethod == "PUT":
-                response_data["data"] = self.update_user_settings(body)
-            else:
-                raise ValueError(f"Unsupported HTTP method: {httpMethod}")
-
-        except Exception as e:
-            response_data["status"] = "error"
-            response_data["error"] = str(e)
-
-        response = {
+    def get_200_response(self, message="", data={}):
+        return {
             "statusCode": 200,
-            "headers": {
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "OPTIONS,PUT,GET",
-            },
-            "body": json.dumps(response_data),
+            "headers": self.headers,
+            "body": json.dumps(
+                {
+                    "event": self.event,
+                    "message": message,
+                    "data": data,
+                }
+            ),
         }
-        return response
 
     def get_user_settings(self):
         response = self.user_settings_table.get_item(
@@ -66,14 +56,11 @@ class UserSettingsHandler:
         )
         item = response.get("Item")
         if item:
-            username = item.get("username", "")
-            email = item.get("email", "")
-        else:
-            username = self.username
-            email = self.email
+            self.username = item.get("username", "")
+            self.email = item.get("email", "")
         return {
-            "username": username,
-            "email": email,
+            "username": self.username,
+            "email": self.email,
         }
 
     def update_user_settings(self, body: dict):
@@ -96,6 +83,52 @@ class UserSettingsHandler:
             "username": username,
             "email": email,
         }
+
+    def handle_get_user_settings(self):
+        if self.user_id is None:
+            return self.get_400_response(
+                message="Unauthorized: No user ID found in claims"
+            )
+
+        data = self.get_user_settings()
+        return self.get_200_response(message="Settings retrieved", data=data)
+
+    def handle_update_user_settings(self):
+        if self.user_id is None:
+            return self.get_400_response(
+                message="Unauthorized: No user ID found in claims"
+            )
+
+        try:
+            data = self.update_user_settings(self.body)
+        except ValueError as e:
+            return self.get_400_response(message=str(e))
+        return self.get_200_response(message="Settings updated", data=data)
+
+    def handle(self, event, context):
+        self.event = event
+        self.body = (
+            json.loads(event.get("body", "{}")) if event.get("body") else {}
+        )
+        claims = (
+            event.get("requestContext", {}).get("authorizer", {}).get("claims")
+        )
+        if claims:
+            self.user_id = claims.get("sub")
+            self.username = claims.get("cognito:username")
+            self.email = claims.get("email")
+            self.get_user_settings()
+
+        httpMethod = event.get("httpMethod")
+        if httpMethod == "GET":
+            response = self.handle_get_user_settings()
+        elif httpMethod == "PUT":
+            response = self.handle_update_user_settings()
+        else:
+            response = self.get_400_response(message="Unsupported HTTP method")
+        # Add CORS headers to the response
+        response["headers"] = self.headers
+        return response
 
 
 def lambda_handler(event, context):
