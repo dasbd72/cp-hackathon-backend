@@ -15,54 +15,14 @@ class ApiCreator:
 
         self.session = get_boto3_session(self.config)
         self.sts = self.session.client("sts")
-        self.s3 = self.session.client("s3")
         self.lmbda = self.session.client("lambda")
         self.apigateway = self.session.client("apigateway")
         self.cognito = self.session.client("cognito-idp")
 
-    def compress_and_upload_function_code(
-        self, function_path: str, bucket_name: str
-    ) -> str:
+    def get_lambda_function_arn(self, function_name: str) -> str:
         """
-        Compress the function code into a zip file, and upload it to S3.
-
-        Example
-        function_path: user/settings/get
-
-        with the following structure:
-        user/settings/get/lambda_handler.py
-        user/settings/get/lib/*
-
-        into:
-        user/settings/get/lambda_handler.zip
+        Get the ARN of the lambda function by name.
         """
-        zip_file_path = os.path.join(function_path, "lambda_handler.zip")
-        with zipfile.ZipFile(zip_file_path, "w") as zipf:
-            # Walk the directory and add files to the zip file
-            for root, _, files in os.walk(function_path):
-                for file in files:
-                    if file.endswith(".zip"):
-                        # Skip zip files to avoid recursion
-                        continue
-                    file_path = os.path.join(root, file)
-                    # Add the file to the zip file, preserving the directory structure
-                    zipf.write(
-                        file_path,
-                        os.path.relpath(file_path, function_path),
-                    )
-        # Upload the zip file to S3
-        self.s3.upload_file(
-            Filename=zip_file_path,
-            Bucket=bucket_name,
-            Key=zip_file_path,
-        )
-        # Delete the zip file after uploading
-        os.remove(zip_file_path)
-        return zip_file_path
-
-    def create_lambda_function(
-        self, function_name: str, bucket_name: str, bucket_key: str
-    ) -> str:
         # Search for the function by name
         response = self.lmbda.list_functions()
         function_arn = None
@@ -77,40 +37,6 @@ class ApiCreator:
                     )
                 else:
                     function_arn = function["FunctionArn"]
-        # If the function is not found, create it
-        # Otherwise, update it
-        if function_arn is None:
-            print(
-                f"Function with name {function_name} not found, creating a new one."
-            )
-            response = self.lmbda.create_function(
-                FunctionName=function_name,
-                Runtime="python3.10",
-                Role=self.config["role_arn"],
-                Handler="lambda_handler.lambda_handler",
-                Code={
-                    "S3Bucket": bucket_name,
-                    "S3Key": bucket_key,
-                },
-                Timeout=30,
-            )
-            function_arn = response["FunctionArn"]
-        else:
-            print(f"Function with name {function_name} found, updating it.")
-            self.lmbda.update_function_configuration(
-                FunctionName=function_name,
-                Role=self.config["role_arn"],
-                Handler="lambda_handler.lambda_handler",
-                Timeout=30,
-            )
-            self.lmbda.get_waiter("function_updated").wait(
-                FunctionName=function_name,
-            )
-            self.lmbda.update_function_code(
-                FunctionName=function_name,
-                S3Bucket=bucket_name,
-                S3Key=bucket_key,
-            )
         return function_arn
 
     def create_cognito_user_pool(self) -> str:
@@ -480,6 +406,7 @@ class ApiCreator:
         self,
         api_id: str,
         resource_id: str,
+        allow_methods: list = ["OPTIONS", "GET", "POST", "PUT", "DELETE"],
     ):
         """
         Create CORS for the resource.
@@ -505,7 +432,7 @@ class ApiCreator:
             responseParameters={
                 "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
                 "method.response.header.Access-Control-Allow-Origin": "'*'",
-                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,PUT,GET'",
+                "method.response.header.Access-Control-Allow-Methods": f"'{','.join(allow_methods)}'",
             },
             responseTemplates={"application/json": '{"statusCode": 200}'},
         )
@@ -533,28 +460,6 @@ class ApiCreator:
         return invoke_url
 
     def run(self):
-        # Compress, Upload, and Create the get user settings lambda function
-        user_settings_function_arn = self.create_lambda_function(
-            function_name="cp_hackathon_get_user_settings",
-            bucket_name=self.config["lambda_bucket_name"],
-            bucket_key=self.compress_and_upload_function_code(
-                function_path="functions/user/settings",
-                bucket_name=self.config["lambda_bucket_name"],
-            ),
-        )
-        print(f"User Settings function ARN: {user_settings_function_arn}")
-
-        # Compress, Upload, and Create the user image lambda function
-        user_image_function_arn = self.create_lambda_function(
-            function_name="cp_hackathon_user_image",
-            bucket_name=self.config["lambda_bucket_name"],
-            bucket_key=self.compress_and_upload_function_code(
-                function_path="functions/user/image",
-                bucket_name=self.config["lambda_bucket_name"],
-            ),
-        )
-        print(f"User Image function ARN: {user_image_function_arn}")
-
         # Create the user pool
         user_pool_id = self.create_cognito_user_pool()
         print(f"User Pool ID: {user_pool_id}")
@@ -620,6 +525,11 @@ class ApiCreator:
             resource_id=user_settings_id,
         )
 
+        # Get the user settings function ARN
+        user_settings_function_arn = self.get_lambda_function_arn(
+            function_name=self.config["user_settings_function_name"],
+        )
+
         # Create GET and PUT methods for the user settings resource
         for httpMethod in ["GET", "PUT"]:
             self.create_method(
@@ -676,6 +586,11 @@ class ApiCreator:
             resource_id=user_image_id,
         )
 
+        # Get the user image function ARN
+        user_image_function_arn = self.get_lambda_function_arn(
+            function_name=self.config["user_image_function_name"],
+        )
+
         # Create GET and POST methods for the user image resource
         for httpMethod in ["GET", "POST"]:
             self.create_method(
@@ -714,6 +629,132 @@ class ApiCreator:
                             "data": {
                                 "image_url": "https://example.com/image.jpg"
                             }
+                        },
+                    )
+                },
+            )
+
+        # Create the music resource
+        music_id = self.create_resource(
+            api_id,
+            root_id,
+            "music",
+        )
+        print(f"Music Resource ID: {music_id}")
+
+        # Create CORS for the music resource
+        self.create_resource_cors(
+            api_id=api_id,
+            resource_id=music_id,
+        )
+
+        # Get the music function ARN
+        music_function_arn = self.get_lambda_function_arn(
+            function_name=self.config["music_function_name"],
+        )
+
+        # Create GET and POST methods for the music resource
+        for httpMethod in ["GET", "POST", "DELETE"]:
+            self.create_method(
+                api_id=api_id,
+                resource_id=music_id,
+                http_method=httpMethod,
+                authorizer_id=authorizer_id,
+            )
+            # Create the music integration
+            self.apigateway.put_integration(
+                restApiId=api_id,
+                resourceId=music_id,
+                httpMethod=httpMethod,
+                type="AWS_PROXY",
+                integrationHttpMethod="POST",
+                uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{music_function_arn}/invocations",
+                credentials=self.config["role_arn"],
+                requestTemplates={"application/json": '{"statusCode": 200}'},
+                passthroughBehavior="WHEN_NO_MATCH",
+                contentHandling="CONVERT_TO_TEXT",
+                timeoutInMillis=10000,  # 10 seconds
+            )
+            self.apigateway.put_integration_response(
+                restApiId=api_id,
+                resourceId=music_id,
+                httpMethod=httpMethod,
+                statusCode="200",
+                responseParameters={
+                    "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+                    "method.response.header.Access-Control-Allow-Origin": "'*'",
+                    "method.response.header.Access-Control-Allow-Methods": f"'{httpMethod}'",
+                },
+                responseTemplates={
+                    "application/json": json.dumps(
+                        {
+                            "data": [
+                                {
+                                    "music_id": "1234567890",
+                                    "title": "Song Title",
+                                    "s3_key": "songs/song.mp3",
+                                }
+                            ]
+                        },
+                    )
+                },
+            )
+
+        # Create the music list resource
+        music_list_id = self.create_resource(
+            api_id,
+            music_id,
+            "list",
+        )
+        print(f"Music List Resource ID: {music_list_id}")
+
+        # Create CORS for the music list resource
+        self.create_resource_cors(
+            api_id=api_id,
+            resource_id=music_list_id,
+        )
+
+        # Create the music list integration
+        for httpMethod in ["GET"]:
+            self.create_method(
+                api_id=api_id,
+                resource_id=music_list_id,
+                http_method=httpMethod,
+                authorizer_id=authorizer_id,
+            )
+            self.apigateway.put_integration(
+                restApiId=api_id,
+                resourceId=music_list_id,
+                httpMethod=httpMethod,
+                type="AWS_PROXY",
+                integrationHttpMethod="POST",
+                uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{music_function_arn}/invocations",
+                credentials=self.config["role_arn"],
+                requestTemplates={"application/json": '{"statusCode": 200}'},
+                passthroughBehavior="WHEN_NO_MATCH",
+                contentHandling="CONVERT_TO_TEXT",
+                timeoutInMillis=10000,  # 10 seconds
+            )
+            self.apigateway.put_integration_response(
+                restApiId=api_id,
+                resourceId=music_list_id,
+                httpMethod=httpMethod,
+                statusCode="200",
+                responseParameters={
+                    "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+                    "method.response.header.Access-Control-Allow-Origin": "'*'",
+                    "method.response.header.Access-Control-Allow-Methods": f"'{httpMethod}'",
+                },
+                responseTemplates={
+                    "application/json": json.dumps(
+                        {
+                            "data": [
+                                {
+                                    "music_id": "1234567890",
+                                    "title": "Song Title",
+                                    "s3_key": "songs/song.mp3",
+                                }
+                            ]
                         },
                     )
                 },
