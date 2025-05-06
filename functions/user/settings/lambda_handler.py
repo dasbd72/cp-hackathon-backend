@@ -19,18 +19,13 @@ class UserSettingsHandler:
         self.email = None
 
     def handle(self, event, context):
-        # claims = (
-        #     event.get("requestContext", {}).get("authorizer", {}).get("claims")
-        # )
-        # if claims:
-        #     self.user_id = claims.get("sub")
-        #     self.username = claims.get("cognito:username")
-        #     self.email = claims.get("email")
-
-        # dummy authentication with query string parameters
-        self.user_id = self.username = event.get(
-            "queryStringParameters", {}
-        ).get("username")
+        claims = (
+            event.get("requestContext", {}).get("authorizer", {}).get("claims")
+        )
+        if claims:
+            self.user_id = claims.get("sub")
+            self.username = claims.get("cognito:username")
+            self.email = claims.get("email")
 
         httpMethod = event.get("httpMethod")
         body = json.loads(event.get("body", "{}")) if event.get("body") else {}

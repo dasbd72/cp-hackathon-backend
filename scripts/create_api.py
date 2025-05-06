@@ -590,39 +590,39 @@ class ApiCreator:
         )
         print(f"User Image function ARN: {user_image_function_arn}")
 
-        # # Create the user pool
-        # user_pool_id = self.create_cognito_user_pool()
-        # print(f"User Pool ID: {user_pool_id}")
+        # Create the user pool
+        user_pool_id = self.create_cognito_user_pool()
+        print(f"User Pool ID: {user_pool_id}")
 
-        # # Create the user pool client
-        # user_pool_client_id = self.create_cognito_user_pool_client(
-        #     user_pool_id=user_pool_id,
-        # )
-        # print(f"User Pool Client ID: {user_pool_client_id}")
+        # Create the user pool client
+        user_pool_client_id = self.create_cognito_user_pool_client(
+            user_pool_id=user_pool_id,
+        )
+        print(f"User Pool Client ID: {user_pool_client_id}")
 
-        # # Create the managed login
-        # managed_login_id = self.create_cognito_managed_login(
-        #     user_pool_id=user_pool_id,
-        #     user_pool_client_id=user_pool_client_id,
-        # )
-        # print("Managed Login ID:", managed_login_id)
+        # Create the managed login
+        managed_login_id = self.create_cognito_managed_login(
+            user_pool_id=user_pool_id,
+            user_pool_client_id=user_pool_client_id,
+        )
+        print("Managed Login ID:", managed_login_id)
 
-        # # Create the user pool domain
-        # user_pool_domain = self.create_cognito_user_pool_domain(
-        #     user_pool_id=user_pool_id,
-        # )
-        # print(f"User Pool Domain: {user_pool_domain}")
+        # Create the user pool domain
+        user_pool_domain = self.create_cognito_user_pool_domain(
+            user_pool_id=user_pool_id,
+        )
+        print(f"User Pool Domain: {user_pool_domain}")
 
         # Create the API
         api_id = self.create_rest_api()
         print(f"API ID: {api_id}")
 
         # Create the authorizer
-        # authorizer_id = self.create_authorizer(
-        #     api_id=api_id,
-        #     user_pool_id=user_pool_id,
-        # )
-        # print(f"Authorizer ID: {authorizer_id}")
+        authorizer_id = self.create_authorizer(
+            api_id=api_id,
+            user_pool_id=user_pool_id,
+        )
+        print(f"Authorizer ID: {authorizer_id}")
 
         # Search for resources
         resources = self.apigateway.get_resources(restApiId=api_id)
@@ -661,7 +661,7 @@ class ApiCreator:
                 api_id=api_id,
                 resource_id=user_settings_id,
                 http_method=httpMethod,
-                # authorizer_id=authorizer_id,
+                authorizer_id=authorizer_id,
             )
             # Create the user settings integration
             self.apigateway.put_integration(
@@ -717,7 +717,7 @@ class ApiCreator:
                 api_id=api_id,
                 resource_id=user_image_id,
                 http_method=httpMethod,
-                # authorizer_id=authorizer_id,
+                authorizer_id=authorizer_id,
             )
             # Create the user image integration
             self.apigateway.put_integration(
@@ -754,11 +754,11 @@ class ApiCreator:
                 },
             )
 
-        # print("Client ID:", user_pool_client_id)
-        # print(
-        #     "Authority: ",
-        #     f"https://cognito-idp.{self.session.region_name}.amazonaws.com/{user_pool_id}",
-        # )
+        print("Client ID:", user_pool_client_id)
+        print(
+            "Authority: ",
+            f"https://cognito-idp.{self.session.region_name}.amazonaws.com/{user_pool_id}",
+        )
 
         invoke_url = self.deploy_api(api_id=api_id)
         print(f"Invoke URL: {invoke_url}")

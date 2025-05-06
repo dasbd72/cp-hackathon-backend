@@ -8,6 +8,13 @@ class UserImageHandler:
     def __init__(self):
         self.s3 = boto3.client("s3")
         self.image_storage_bucket_name = "raspberrypi-image-storage"
+        self.dynamodb = boto3.resource("dynamodb")
+        self.user_settings_db_table_name = (
+            "cp-hackathon-backend-user-settings-db-table"
+        )
+        self.user_settings_table = self.dynamodb.Table(
+            self.user_settings_db_table_name
+        )
         self.headers = {
             "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
             "Access-Control-Allow-Origin": "*",
@@ -43,15 +50,32 @@ class UserImageHandler:
             ),
         }
 
+    def get_user_settings(self):
+        response = self.user_settings_table.get_item(
+            Key={"user_id": self.user_id},
+        )
+        item = response.get("Item")
+        if item:
+            self.username = item.get("username", "")
+            self.email = item.get("email", "")
+        return {
+            "username": self.username,
+            "email": self.email,
+        }
+
     def handle(self, event, context):
         self.event = event
         self.body = (
             json.loads(event.get("body", "{}")) if event.get("body") else {}
         )
-        # dummy authentication with query string parameters
-        self.user_id = self.username = event.get(
-            "queryStringParameters", {}
-        ).get("username")
+        claims = (
+            event.get("requestContext", {}).get("authorizer", {}).get("claims")
+        )
+        if claims:
+            self.user_id = claims.get("sub")
+            self.username = claims.get("cognito:username")
+            self.email = claims.get("email")
+            self.get_user_settings()
 
         httpMethod = event.get("httpMethod")
         if httpMethod == "GET":
