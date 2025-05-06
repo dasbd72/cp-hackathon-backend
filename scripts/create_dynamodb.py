@@ -116,29 +116,29 @@ class DynamoDBCreator:
             print(f"Table {table_name} already exists.")
 
         # Search for existing indexes
-        index_exists = "music-name-index" in [
+        index_exists = "title-index" in [
             index["IndexName"]
             for index in self.dynamodb.describe_table(TableName=table_name)[
                 "Table"
             ].get("GlobalSecondaryIndexes", [])
         ]
         if not index_exists:
-            # Add second attribute music_name to the table
+            # Add second attribute title to the table
             self.dynamodb.update_table(
                 TableName=table_name,
                 AttributeDefinitions=[
                     {
-                        "AttributeName": "music_name",
+                        "AttributeName": "title",
                         "AttributeType": "S",
                     },
                 ],
                 GlobalSecondaryIndexUpdates=[
                     {
                         "Create": {
-                            "IndexName": "music-name-index",
+                            "IndexName": "title-index",
                             "KeySchema": [
                                 {
-                                    "AttributeName": "music_name",
+                                    "AttributeName": "title",
                                     "KeyType": "HASH",
                                 },
                             ],
@@ -153,9 +153,9 @@ class DynamoDBCreator:
                     }
                 ],
             )
-            print(f"Index music-name-index created.")
+            print(f"Index title-index created.")
         else:
-            print(f"Index music-name-index already exists.")
+            print(f"Index title-index already exists.")
 
     def run(self):
         # Create the user settings table
