@@ -50,9 +50,9 @@ class UserSettingsHandler:
             ),
         }
 
-    def get_user_settings(self):
+    def get_user_settings(self, user_id):
         response = self.user_settings_table.get_item(
-            Key={"user_id": self.user_id},
+            Key={"user_id": user_id},
         )
         item = response.get("Item")
         if item:
@@ -85,12 +85,15 @@ class UserSettingsHandler:
         }
 
     def handle_get_user_settings(self):
-        if self.user_id is None:
+        query_params = self.event.get("queryStringParameters")
+        if not query_params:
+            query_params = {}
+        if "user_id" not in query_params:
             return self.get_400_response(
-                message="Unauthorized: No user ID found in claims"
+                message="user_id is required in query parameters"
             )
-
-        data = self.get_user_settings()
+        user_id = query_params.get("user_id")
+        data = self.get_user_settings(user_id)
         return self.get_200_response(message="Settings retrieved", data=data)
 
     def handle_update_user_settings(self):
@@ -117,7 +120,7 @@ class UserSettingsHandler:
             self.user_id = claims.get("sub")
             self.username = claims.get("cognito:username")
             self.email = claims.get("email")
-            self.get_user_settings()
+            self.get_user_settings(self.user_id)
 
         httpMethod = event.get("httpMethod")
         if httpMethod == "GET":

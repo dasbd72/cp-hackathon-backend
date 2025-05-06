@@ -101,15 +101,14 @@ class UserImageHandler:
         return presigned_url
 
     def handle_get_user_image(self):
-        if self.user_id is None:
-            return self.get_400_response(
-                message="Unauthorized: No user ID found in claims"
-            )
-
         query_params = self.event.get("queryStringParameters")
         if not query_params:
             query_params = {}
-        user_id = query_params.get("user_id", self.user_id)
+        if "user_id" not in query_params:
+            return self.get_400_response(
+                message="user_id is required in query parameters"
+            )
+        user_id = query_params.get("user_id")
 
         presigned_url = self.get_user_image(user_id=user_id)
         if presigned_url is None:

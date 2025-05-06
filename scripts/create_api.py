@@ -532,12 +532,19 @@ class ApiCreator:
 
         # Create GET and PUT methods for the user settings resource
         for httpMethod in ["GET", "PUT"]:
-            self.create_method(
-                api_id=api_id,
-                resource_id=user_settings_id,
-                http_method=httpMethod,
-                authorizer_id=authorizer_id,
-            )
+            if httpMethod in ["GET"]:
+                self.create_method(
+                    api_id=api_id,
+                    resource_id=user_settings_id,
+                    http_method=httpMethod,
+                )
+            else:
+                self.create_method(
+                    api_id=api_id,
+                    resource_id=user_settings_id,
+                    http_method=httpMethod,
+                    authorizer_id=authorizer_id,
+                )
             # Create the user settings integration
             self.apigateway.put_integration(
                 restApiId=api_id,
@@ -593,12 +600,20 @@ class ApiCreator:
 
         # Create GET and POST methods for the user image resource
         for httpMethod in ["GET", "POST"]:
-            self.create_method(
-                api_id=api_id,
-                resource_id=user_image_id,
-                http_method=httpMethod,
-                authorizer_id=authorizer_id,
-            )
+            if httpMethod in ["GET"]:
+                # Create the music GET method
+                self.create_method(
+                    api_id=api_id,
+                    resource_id=user_image_id,
+                    http_method=httpMethod,
+                )
+            else:
+                self.create_method(
+                    api_id=api_id,
+                    resource_id=user_image_id,
+                    http_method=httpMethod,
+                    authorizer_id=authorizer_id,
+                )
             # Create the user image integration
             self.apigateway.put_integration(
                 restApiId=api_id,
@@ -655,12 +670,20 @@ class ApiCreator:
 
         # Create GET and POST methods for the music resource
         for httpMethod in ["GET", "POST", "DELETE"]:
-            self.create_method(
-                api_id=api_id,
-                resource_id=music_id,
-                http_method=httpMethod,
-                authorizer_id=authorizer_id,
-            )
+            if httpMethod in ["GET"]:
+                # Create the music GET method
+                self.create_method(
+                    api_id=api_id,
+                    resource_id=music_id,
+                    http_method=httpMethod,
+                )
+            else:
+                self.create_method(
+                    api_id=api_id,
+                    resource_id=music_id,
+                    http_method=httpMethod,
+                    authorizer_id=authorizer_id,
+                )
             # Create the music integration
             self.apigateway.put_integration(
                 restApiId=api_id,
@@ -720,7 +743,6 @@ class ApiCreator:
                 api_id=api_id,
                 resource_id=music_list_id,
                 http_method=httpMethod,
-                authorizer_id=authorizer_id,
             )
             self.apigateway.put_integration(
                 restApiId=api_id,
