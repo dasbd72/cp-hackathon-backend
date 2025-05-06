@@ -24,8 +24,6 @@ class UserImageHandler:
         self.event = None
         self.body = None
         self.user_id = None
-        self.username = None
-        self.email = None
 
     def get_400_response(self, code=400, message="Bad Request"):
         return {
@@ -50,19 +48,6 @@ class UserImageHandler:
             ),
         }
 
-    def get_user_settings(self):
-        response = self.user_settings_table.get_item(
-            Key={"user_id": self.user_id},
-        )
-        item = response.get("Item")
-        if item:
-            self.username = item.get("username", "")
-            self.email = item.get("email", "")
-        return {
-            "username": self.username,
-            "email": self.email,
-        }
-
     def generate_user_image_presigned_url(self, user_id: str) -> str:
         # Generate a presigned URL for the image
         s3_key = f"roles/{user_id}.jpg"
@@ -82,9 +67,7 @@ class UserImageHandler:
         except Exception as e:
             return None
         # If the image exists, return the presigned URL
-        presigned_url = self.generate_user_image_presigned_url(
-            user_id=user_id
-        )
+        presigned_url = self.generate_user_image_presigned_url(user_id=user_id)
         return presigned_url
 
     def update_user_image(self, image_data: bytes):
@@ -140,7 +123,9 @@ class UserImageHandler:
         return self.get_200_response(
             message="Image updated successfully",
             data={
-                "image_url": self.generate_user_image_presigned_url(self.user_id),
+                "image_url": self.generate_user_image_presigned_url(
+                    self.user_id
+                ),
             },
         )
 
@@ -154,9 +139,6 @@ class UserImageHandler:
         )
         if claims:
             self.user_id = claims.get("sub")
-            self.username = claims.get("cognito:username")
-            self.email = claims.get("email")
-            self.get_user_settings()
 
         httpMethod = event.get("httpMethod")
         if httpMethod == "GET":

@@ -28,8 +28,6 @@ class MusicHandler:
         self.event = None
         self.body = None
         self.user_id = None
-        self.username = None
-        self.email = None
 
     def get_400_response(self, code=400, message="Bad Request"):
         return {
@@ -52,19 +50,6 @@ class MusicHandler:
                     "data": data,
                 }
             ),
-        }
-
-    def get_user_settings(self):
-        response = self.user_settings_table.get_item(
-            Key={"user_id": self.user_id},
-        )
-        item = response.get("Item")
-        if item:
-            self.username = item.get("username", "")
-            self.email = item.get("email", "")
-        return {
-            "username": self.username,
-            "email": self.email,
         }
 
     def generate_presigned_url(self, s3_key: str) -> str:
@@ -229,9 +214,6 @@ class MusicHandler:
         )
         if claims:
             self.user_id = claims.get("sub")
-            self.username = claims.get("cognito:username")
-            self.email = claims.get("email")
-            self.get_user_settings()
 
         httpMethod = event.get("httpMethod")
         path = event.get("path")
