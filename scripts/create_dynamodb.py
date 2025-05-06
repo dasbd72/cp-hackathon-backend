@@ -48,7 +48,7 @@ class DynamoDBCreator:
             index["IndexName"]
             for index in self.dynamodb.describe_table(TableName=table_name)[
                 "Table"
-            ]["GlobalSecondaryIndexes"]
+            ].get("GlobalSecondaryIndexes", [])
         ]
         if not index_exists:
             # Add second attribute username to the table
@@ -85,12 +85,86 @@ class DynamoDBCreator:
         else:
             print(f"Index username-index already exists.")
 
+    def create_musics_table(self, table_name):
+        # Search for existing tables
+        table_exists = table_name in self.dynamodb.list_tables()["TableNames"]
+        if not table_exists:
+            self.dynamodb.create_table(
+                TableName=table_name,
+                KeySchema=[
+                    {
+                        "AttributeName": "music_id",
+                        "KeyType": "HASH",
+                    },
+                ],
+                AttributeDefinitions=[
+                    {
+                        "AttributeName": "music_id",
+                        "AttributeType": "S",
+                    },
+                ],
+                ProvisionedThroughput={
+                    "ReadCapacityUnits": 5,
+                    "WriteCapacityUnits": 5,
+                },
+            )
+            # Wait for the table to be created
+            waiter = self.dynamodb.get_waiter("table_exists")
+            waiter.wait(TableName=table_name)
+            print(f"Table {table_name} created successfully.")
+        else:
+            print(f"Table {table_name} already exists.")
+
+        # Search for existing indexes
+        index_exists = "music-name-index" in [
+            index["IndexName"]
+            for index in self.dynamodb.describe_table(TableName=table_name)[
+                "Table"
+            ].get("GlobalSecondaryIndexes", [])
+        ]
+        if not index_exists:
+            # Add second attribute music_name to the table
+            self.dynamodb.update_table(
+                TableName=table_name,
+                AttributeDefinitions=[
+                    {
+                        "AttributeName": "music_name",
+                        "AttributeType": "S",
+                    },
+                ],
+                GlobalSecondaryIndexUpdates=[
+                    {
+                        "Create": {
+                            "IndexName": "music-name-index",
+                            "KeySchema": [
+                                {
+                                    "AttributeName": "music_name",
+                                    "KeyType": "HASH",
+                                },
+                            ],
+                            "Projection": {
+                                "ProjectionType": "ALL",
+                            },
+                            "ProvisionedThroughput": {
+                                "ReadCapacityUnits": 5,
+                                "WriteCapacityUnits": 5,
+                            },
+                        }
+                    }
+                ],
+            )
+            print(f"Index music-name-index created.")
+        else:
+            print(f"Index music-name-index already exists.")
+
     def run(self):
         # Create the user settings table
         # and add the username index if it doesn't exist
         self.create_user_settings_table(
             self.config["user_settings_db_table_name"]
         )
+        # Create the musics table
+        self.create_musics_table(self.config["musics_db_table_name"])
 
 
 if __name__ == "__main__":

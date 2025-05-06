@@ -20,35 +20,6 @@ class ApiCreator:
         self.apigateway = self.session.client("apigateway")
         self.cognito = self.session.client("cognito-idp")
 
-    def create_s3_bucket(self, bucket_name: str):
-        # Search for the bucket by name
-        response = self.s3.list_buckets()
-        bucket_arn = None
-        for bucket in response["Buckets"]:
-            if bucket["Name"] == bucket_name:
-                if bucket_arn is not None:
-                    print(
-                        f"Bucket with name {bucket_name} already exists, deleting ARN {bucket['Name']}."
-                    )
-                    self.s3.delete_bucket(Bucket=bucket["Name"])
-                else:
-                    bucket_arn = bucket["Name"]
-        # If the bucket is not found, create it
-        if bucket_arn is None:
-            print(
-                f"Bucket with name {bucket_name} not found, creating a new one."
-            )
-            if self.session.region_name == "us-east-1":
-                self.s3.create_bucket(Bucket=bucket_name)
-            else:
-                self.s3.create_bucket(
-                    Bucket=bucket_name,
-                    CreateBucketConfiguration={
-                        "LocationConstraint": self.session.region_name,
-                    },
-                )
-        return bucket_arn
-
     def compress_and_upload_function_code(
         self, function_path: str, bucket_name: str
     ) -> str:
@@ -562,12 +533,6 @@ class ApiCreator:
         return invoke_url
 
     def run(self):
-        # Create the S3 bucket
-        lambda_bucket_arn = self.create_s3_bucket(
-            bucket_name=self.config["lambda_bucket_name"],
-        )
-        print(f"Lambda bucket ARN: {lambda_bucket_arn}")
-
         # Compress, Upload, and Create the get user settings lambda function
         user_settings_function_arn = self.create_lambda_function(
             function_name="cp_hackathon_get_user_settings",
@@ -731,7 +696,7 @@ class ApiCreator:
                 requestTemplates={"application/json": '{"statusCode": 200}'},
                 passthroughBehavior="WHEN_NO_MATCH",
                 contentHandling="CONVERT_TO_TEXT",
-                timeoutInMillis=10000, # 10 seconds
+                timeoutInMillis=10000,  # 10 seconds
             )
             self.apigateway.put_integration_response(
                 restApiId=api_id,
