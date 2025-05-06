@@ -70,6 +70,9 @@ class ApiCreator:
             # Walk the directory and add files to the zip file
             for root, _, files in os.walk(function_path):
                 for file in files:
+                    if file.endswith(".zip"):
+                        # Skip zip files to avoid recursion
+                        continue
                     file_path = os.path.join(root, file)
                     # Add the file to the zip file, preserving the directory structure
                     zipf.write(
