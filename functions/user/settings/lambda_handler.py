@@ -22,8 +22,6 @@ class UserSettingsHandler:
         self.event = None
         self.body = None
         self.user_id = None
-        self.username = None
-        self.email = None
 
     def get_400_response(self, code=400, message="Bad Request"):
         return {
@@ -55,12 +53,18 @@ class UserSettingsHandler:
             Key={"user_id": user_id},
         )
         item = response.get("Item")
+        username = ""
+        email = ""
+        music_id = ""
         if item:
-            self.username = item.get("username", "")
-            self.email = item.get("email", "")
+            username = item.get("username", "")
+            email = item.get("email", "")
+            music_id = item.get("music_id", "")
         return {
-            "username": self.username,
-            "email": self.email,
+            "user_id": user_id,
+            "username": username,
+            "email": email,
+            "music_id": music_id,
         }
 
     def update_user_settings(self, body: dict):
@@ -68,20 +72,26 @@ class UserSettingsHandler:
             raise ValueError("Missing required field: username")
         if "email" not in body:
             raise ValueError("Missing required field: email")
+        if "music_id" not in body:
+            raise ValueError("Missing required field: music_id")
         username = body.get("username")
         email = body.get("email")
+        music_id = body.get("music_id")
         self.user_settings_table.update_item(
             Key={"user_id": self.user_id},
-            UpdateExpression="SET username = :username, email = :email",
+            UpdateExpression="SET username = :username, email = :email, music_id = :music_id",
             ExpressionAttributeValues={
                 ":username": username,
                 ":email": email,
+                ":music_id": music_id,
             },
             ReturnValues="UPDATED_NEW",
         )
         return {
+            "user_id": self.user_id,
             "username": username,
             "email": email,
+            "music_id": music_id,
         }
 
     def handle_get_user_settings(self):
@@ -118,9 +128,6 @@ class UserSettingsHandler:
         )
         if claims:
             self.user_id = claims.get("sub")
-            self.username = claims.get("cognito:username")
-            self.email = claims.get("email")
-            self.get_user_settings(self.user_id)
 
         httpMethod = event.get("httpMethod")
         if httpMethod == "GET":
