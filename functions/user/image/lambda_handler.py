@@ -7,7 +7,7 @@ import boto3
 class UserImageHandler:
     def __init__(self):
         self.s3 = boto3.client("s3")
-        self.image_storage_bucket_name = "raspberrypi-image-storage"
+        self.image_storage_bucket_name = "raspberrypi-image-storage2"
         self.dynamodb = boto3.resource("dynamodb")
         self.user_settings_db_table_name = (
             "cp-hackathon-211125752079-backend-user-settings-db-table"

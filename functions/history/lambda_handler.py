@@ -8,7 +8,7 @@ class HistoryHandler:
     def __init__(self):
         self.s3 = boto3.client("s3")
         self.sts = boto3.client("sts")
-        self.image_storage_bucket_name = "raspberrypi-image-storage"
+        self.image_storage_bucket_name = "raspberrypi-image-storage2"
         self.dynamodb = boto3.resource("dynamodb")
         account_id = self.sts.get_caller_identity().get("Account")
         self.user_settings_db_table_name = (
