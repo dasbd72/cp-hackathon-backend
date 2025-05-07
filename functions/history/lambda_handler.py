@@ -1,3 +1,4 @@
+import os
 import json
 
 import boto3
@@ -85,12 +86,41 @@ class HistoryHandler:
             item["presigned_url"] = self.generate_presigned_url(item["s3_key"])
         return decoded_list
 
+    def get_results_by_decoded_key(self, decoded_key: str):
+        try:
+            results_key = decoded_key.replace("decoded/", "results/")
+            results_key = os.path.splitext(results_key)[0]
+            results_key = results_key + "_match.json"
+            # Read the results file from S3
+            response = self.s3.get_object(
+                Bucket=self.image_storage_bucket_name, Key=results_key
+            )
+            results = json.loads(response["Body"].read().decode("utf-8"))
+        except Exception as e:
+            results = {
+                "error": str(e),
+                "message": "Error retrieving results for key: {}".format(
+                    results_key
+                ),
+            }
+        return results
+
     def handle_get_history_list(self):
         decoded_list = self.get_decoded_list()
+        history_list = []
+        for item in decoded_list:
+            # Get the results for each decoded image
+            results = self.get_results_by_decoded_key(item["s3_key"])
+            history_list.append(
+                {
+                    "decoded": item,
+                    "results": results,
+                }
+            )
         return self.get_200_response(
             message="History list retrieved successfully",
             data={
-                "history_list": decoded_list,
+                "history_list": history_list,
             },
         )
 
