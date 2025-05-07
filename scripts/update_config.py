@@ -14,6 +14,7 @@ CONFIG_TEMPLATE = {
     "user_settings_function_name": "cp_hackathon_get_user_settings",
     "user_image_function_name": "cp_hackathon_user_image",
     "music_function_name": "cp_hackathon_music",
+    "history_function_name": "cp_hackathon_history",
     "api_name": "cp-hackathon-backend-api",
     "cognito_user_pool_name": "cp-hackathon-backend-user-pool",
     "cognito_user_pool_client_name": "cp-hackathon-backend-user-pool-client",

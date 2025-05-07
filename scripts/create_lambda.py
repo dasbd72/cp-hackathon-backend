@@ -24,15 +24,30 @@ class LambdaCreator:
         Compress the function code into a zip file, and upload it to S3.
 
         Example
-        function_path: user/settings/get
+        function_path: user/settings
 
         with the following structure:
-        user/settings/get/lambda_handler.py
-        user/settings/get/lib/*
+        user/settings/lambda_handler.py
+        user/settings/lib/*
+
+        First install the requirements.txt to a temporary directory
+        `pip install -r requirements.txt -t user/settings/source_code/`
+
+        Then copy the lambda_handler.py and the files to the temporary directory
+
+        Then compress the directory into a zip file
 
         into:
-        user/settings/get/lambda_handler.zip
+        user/settings/lambda_handler.zip
         """
+        # Install the requirements if requirements.txt exists
+        requirements_path = os.path.join(function_path, "requirements.txt")
+        requirements_install_path = os.path.join(function_path, "requirements")
+        if os.path.exists(requirements_path):
+            os.system(
+                f"pip install -r {requirements_path} -t {requirements_install_path}"
+            )
+
         zip_file_path = os.path.join(function_path, "lambda_handler.zip")
         with zipfile.ZipFile(zip_file_path, "w") as zipf:
             # Walk the directory and add files to the zip file
@@ -41,12 +56,30 @@ class LambdaCreator:
                     if file.endswith(".zip"):
                         # Skip zip files to avoid recursion
                         continue
+                    if os.path.join(root, file) == requirements_install_path:
+                        # Skip the requirements directory
+                        continue
                     file_path = os.path.join(root, file)
                     # Add the file to the zip file, preserving the directory structure
                     zipf.write(
                         file_path,
                         os.path.relpath(file_path, function_path),
                     )
+            # Add the requirements to the zip file
+            if os.path.exists(requirements_path):
+                for root, _, files in os.walk(requirements_install_path):
+                    for file in files:
+                        if file.endswith(".zip"):
+                            # Skip zip files to avoid recursion
+                            continue
+                        file_path = os.path.join(root, file)
+                        # Add the file to the zip file, preserving the directory structure
+                        zipf.write(
+                            file_path,
+                            os.path.relpath(
+                                file_path, requirements_install_path
+                            ),
+                        )
         # Upload the zip file to S3
         self.s3.upload_file(
             Filename=zip_file_path,
@@ -143,6 +176,17 @@ class LambdaCreator:
             ),
         )
         print(f"Music function ARN: {get_music_function_arn}")
+
+        # Compress, Upload, and Create the history lambda function
+        get_history_function_arn = self.create_lambda_function(
+            function_name=self.config["history_function_name"],
+            bucket_name=self.config["lambda_bucket_name"],
+            bucket_key=self.compress_and_upload_function_code(
+                function_path="functions/history",
+                bucket_name=self.config["lambda_bucket_name"],
+            ),
+        )
+        print(f"History function ARN: {get_history_function_arn}")
 
 
 if __name__ == "__main__":

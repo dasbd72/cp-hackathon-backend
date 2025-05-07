@@ -402,6 +402,45 @@ class ApiCreator:
             },
         )
 
+    def create_integration_lambda(
+        self,
+        api_id: str,
+        resource_id: str,
+        http_method: str,
+        function_arn: str,
+        timeout: int = 10,
+        request_templates: dict = {"application/json": '{"statusCode": 200}'},
+        response_templates: dict = {"application/json": "{}"},
+    ):
+        """
+        Create the integration for the resource.
+        """
+        self.apigateway.put_integration(
+            restApiId=api_id,
+            resourceId=resource_id,
+            httpMethod=http_method,
+            type="AWS_PROXY",
+            integrationHttpMethod="POST",
+            uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{function_arn}/invocations",
+            credentials=self.config["role_arn"],
+            requestTemplates=request_templates,
+            passthroughBehavior="WHEN_NO_MATCH",
+            contentHandling="CONVERT_TO_TEXT",
+            timeoutInMillis=int(timeout * 1000),  # Convert to milliseconds
+        )
+        self.apigateway.put_integration_response(
+            restApiId=api_id,
+            resourceId=resource_id,
+            httpMethod=http_method,
+            statusCode="200",
+            responseParameters={
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Methods": f"'{http_method}'",
+            },
+            responseTemplates=response_templates,
+        )
+
     def create_resource_cors(
         self,
         api_id: str,
@@ -546,30 +585,14 @@ class ApiCreator:
                     authorizer_id=authorizer_id,
                 )
             # Create the user settings integration
-            self.apigateway.put_integration(
-                restApiId=api_id,
-                resourceId=user_settings_id,
-                httpMethod=httpMethod,
-                type="AWS_PROXY",
-                integrationHttpMethod="POST",
-                uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{user_settings_function_arn}/invocations",
-                credentials=self.config["role_arn"],
-                requestTemplates={"application/json": '{"statusCode": 200}'},
-                passthroughBehavior="WHEN_NO_MATCH",
-                contentHandling="CONVERT_TO_TEXT",
-                timeoutInMillis=10000,  # 10 seconds
-            )
-            self.apigateway.put_integration_response(
-                restApiId=api_id,
-                resourceId=user_settings_id,
-                httpMethod=httpMethod,
-                statusCode="200",
-                responseParameters={
-                    "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                    "method.response.header.Access-Control-Allow-Origin": "'*'",
-                    "method.response.header.Access-Control-Allow-Methods": f"'{httpMethod}'",
-                },
-                responseTemplates={
+            self.create_integration_lambda(
+                api_id=api_id,
+                resource_id=user_settings_id,
+                http_method=httpMethod,
+                function_arn=user_settings_function_arn,
+                timeout=10,
+                request_templates={"application/json": '{"statusCode": 200}'},
+                response_templates={
                     "application/json": json.dumps(
                         {
                             "username": "dasbd72",
@@ -615,36 +638,16 @@ class ApiCreator:
                     authorizer_id=authorizer_id,
                 )
             # Create the user image integration
-            self.apigateway.put_integration(
-                restApiId=api_id,
-                resourceId=user_image_id,
-                httpMethod=httpMethod,
-                type="AWS_PROXY",
-                integrationHttpMethod="POST",
-                uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{user_image_function_arn}/invocations",
-                credentials=self.config["role_arn"],
-                requestTemplates={"application/json": '{"statusCode": 200}'},
-                passthroughBehavior="WHEN_NO_MATCH",
-                contentHandling="CONVERT_TO_TEXT",
-                timeoutInMillis=10000,  # 10 seconds
-            )
-            self.apigateway.put_integration_response(
-                restApiId=api_id,
-                resourceId=user_image_id,
-                httpMethod=httpMethod,
-                statusCode="200",
-                responseParameters={
-                    "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                    "method.response.header.Access-Control-Allow-Origin": "'*'",
-                    "method.response.header.Access-Control-Allow-Methods": f"'{httpMethod}'",
-                },
-                responseTemplates={
+            self.create_integration_lambda(
+                api_id=api_id,
+                resource_id=user_image_id,
+                http_method=httpMethod,
+                function_arn=user_image_function_arn,
+                timeout=10,
+                request_templates={"application/json": '{"statusCode": 200}'},
+                response_templates={
                     "application/json": json.dumps(
-                        {
-                            "data": {
-                                "image_url": "https://example.com/image.jpg"
-                            }
-                        },
+                        {"image_url": "https://example.com/image.jpg"},
                     )
                 },
             )
@@ -685,30 +688,14 @@ class ApiCreator:
                     authorizer_id=authorizer_id,
                 )
             # Create the music integration
-            self.apigateway.put_integration(
-                restApiId=api_id,
-                resourceId=music_id,
-                httpMethod=httpMethod,
-                type="AWS_PROXY",
-                integrationHttpMethod="POST",
-                uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{music_function_arn}/invocations",
-                credentials=self.config["role_arn"],
-                requestTemplates={"application/json": '{"statusCode": 200}'},
-                passthroughBehavior="WHEN_NO_MATCH",
-                contentHandling="CONVERT_TO_TEXT",
-                timeoutInMillis=10000,  # 10 seconds
-            )
-            self.apigateway.put_integration_response(
-                restApiId=api_id,
-                resourceId=music_id,
-                httpMethod=httpMethod,
-                statusCode="200",
-                responseParameters={
-                    "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                    "method.response.header.Access-Control-Allow-Origin": "'*'",
-                    "method.response.header.Access-Control-Allow-Methods": f"'{httpMethod}'",
-                },
-                responseTemplates={
+            self.create_integration_lambda(
+                api_id=api_id,
+                resource_id=music_id,
+                http_method=httpMethod,
+                function_arn=music_function_arn,
+                timeout=10,
+                request_templates={"application/json": '{"statusCode": 200}'},
+                response_templates={
                     "application/json": json.dumps(
                         {
                             "data": [
@@ -744,30 +731,15 @@ class ApiCreator:
                 resource_id=music_list_id,
                 http_method=httpMethod,
             )
-            self.apigateway.put_integration(
-                restApiId=api_id,
-                resourceId=music_list_id,
-                httpMethod=httpMethod,
-                type="AWS_PROXY",
-                integrationHttpMethod="POST",
-                uri=f"arn:aws:apigateway:{self.session.region_name}:lambda:path/2015-03-31/functions/{music_function_arn}/invocations",
-                credentials=self.config["role_arn"],
-                requestTemplates={"application/json": '{"statusCode": 200}'},
-                passthroughBehavior="WHEN_NO_MATCH",
-                contentHandling="CONVERT_TO_TEXT",
-                timeoutInMillis=10000,  # 10 seconds
-            )
-            self.apigateway.put_integration_response(
-                restApiId=api_id,
-                resourceId=music_list_id,
-                httpMethod=httpMethod,
-                statusCode="200",
-                responseParameters={
-                    "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                    "method.response.header.Access-Control-Allow-Origin": "'*'",
-                    "method.response.header.Access-Control-Allow-Methods": f"'{httpMethod}'",
-                },
-                responseTemplates={
+            # Create the music list integration
+            self.create_integration_lambda(
+                api_id=api_id,
+                resource_id=music_list_id,
+                http_method=httpMethod,
+                function_arn=music_function_arn,
+                timeout=10,
+                request_templates={"application/json": '{"statusCode": 200}'},
+                response_templates={
                     "application/json": json.dumps(
                         {
                             "data": [
@@ -775,6 +747,61 @@ class ApiCreator:
                                     "music_id": "1234567890",
                                     "title": "Song Title",
                                     "s3_key": "songs/song.mp3",
+                                }
+                            ]
+                        },
+                    )
+                },
+            )
+
+        # Create the history resource
+        history_id = self.create_resource(
+            api_id,
+            root_id,
+            "history",
+        )
+
+        # Create the history list resource
+        history_list_id = self.create_resource(
+            api_id,
+            history_id,
+            "list",
+        )
+
+        # Create CORS for the history list resource
+        self.create_resource_cors(
+            api_id=api_id,
+            resource_id=history_list_id,
+        )
+
+        # Get the history function ARN
+        history_function_arn = self.get_lambda_function_arn(
+            function_name=self.config["history_function_name"],
+        )
+
+        # Create GET method for the history list resource
+        for httpMethod in ["GET"]:
+            self.create_method(
+                api_id=api_id,
+                resource_id=history_list_id,
+                http_method=httpMethod,
+            )
+            # Create the history list integration
+            self.create_integration_lambda(
+                api_id=api_id,
+                resource_id=history_list_id,
+                http_method=httpMethod,
+                function_arn=history_function_arn,
+                timeout=10,
+                request_templates={"application/json": '{"statusCode": 200}'},
+                response_templates={
+                    "application/json": json.dumps(
+                        {
+                            "history_list": [
+                                {
+                                    "s3_key": "decoded/song.mp3",
+                                    "last_modified": "2023-10-01 12:00:00",
+                                    "presigned_url": "https://example.com/song.mp3",
                                 }
                             ]
                         },
