@@ -10,7 +10,7 @@ class UserImageHandler:
         self.image_storage_bucket_name = "raspberrypi-image-storage"
         self.dynamodb = boto3.resource("dynamodb")
         self.user_settings_db_table_name = (
-            "cp-hackathon-backend-user-settings-db-table"
+            "cp-hackathon-211125752079-backend-user-settings-db-table"
         )
         self.user_settings_table = self.dynamodb.Table(
             self.user_settings_db_table_name

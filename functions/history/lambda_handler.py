@@ -7,10 +7,12 @@ import boto3
 class HistoryHandler:
     def __init__(self):
         self.s3 = boto3.client("s3")
+        self.sts = boto3.client("sts")
         self.image_storage_bucket_name = "raspberrypi-image-storage"
         self.dynamodb = boto3.resource("dynamodb")
+        account_id = self.sts.get_caller_identity().get("Account")
         self.user_settings_db_table_name = (
-            "cp-hackathon-backend-user-settings-db-table"
+            f"cp-hackathon-{account_id}-backend-user-settings-db-table"
         )
         self.user_settings_table = self.dynamodb.Table(
             self.user_settings_db_table_name

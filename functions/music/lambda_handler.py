@@ -9,15 +9,21 @@ import boto3
 class MusicHandler:
     def __init__(self):
         self.s3 = boto3.client("s3")
-        self.musics_storage_bucket_name = "cp-hackathon-backend-musics-bucket"
+        self.sts = boto3.client("sts")
+        account_id = self.sts.get_caller_identity().get("Account")
+        self.musics_storage_bucket_name = (
+            f"cp-hackathon-{account_id}-backend-musics-bucket"
+        )
         self.dynamodb = boto3.resource("dynamodb")
         self.user_settings_db_table_name = (
-            "cp-hackathon-backend-user-settings-db-table"
+            f"cp-hackathon-{account_id}-backend-user-settings-db-table"
         )
         self.user_settings_table = self.dynamodb.Table(
             self.user_settings_db_table_name
         )
-        self.musics_db_table_name = "cp-hackathon-backend-musics-db-table"
+        self.musics_db_table_name = (
+            f"cp-hackathon-{account_id}-backend-musics-db-table"
+        )
         self.musics_table = self.dynamodb.Table(self.musics_db_table_name)
         self.headers = {
             "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
