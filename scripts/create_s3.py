@@ -1,7 +1,3 @@
-import zipfile
-import os
-import json
-
 from .utils import read_confirm_config, get_boto3_session
 
 
@@ -14,7 +10,6 @@ class S3Creator:
             )
 
         self.session = get_boto3_session(self.config)
-        self.sts = self.session.client("sts")
         self.s3 = self.session.client("s3")
 
     def create_s3_bucket(self, bucket_name: str):
