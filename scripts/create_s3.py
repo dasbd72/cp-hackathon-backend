@@ -52,6 +52,11 @@ class S3Creator:
         )
         print(f"Musics bucket name: {musics_bucket_arn}")
 
+        image_storage_bucket_arn = self.create_s3_bucket(
+            bucket_name=self.config["image_storage_bucket_name"],
+        )
+        print(f"Image storage bucket name: {image_storage_bucket_arn}")
+
 
 if __name__ == "__main__":
     api_creator = S3Creator()
